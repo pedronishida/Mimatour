@@ -95,6 +95,8 @@ app.get('/health', (req, res) => {
     service: 'mimatour-api',
     status: 'ok',
     scraper: process.env.VERCEL ? 'vercel' : 'playwright',
+    /** Na Vercel: true = variável SCRAPER_URL está definida (pode buscar viagens reais). */
+    scraper_url_configured: !!process.env.SCRAPER_URL,
     timestamp: new Date().toISOString(),
   });
 });
@@ -104,7 +106,11 @@ app.get('/trips', async (req, res) => {
     const headless = req.query.headless !== 'false';
     const rawTrips = await getTripsRaw(headless);
     const data = toData(rawTrips);
-    res.json({ success: true, data, meta: { total: data.length } });
+    const meta = { total: data.length };
+    if (process.env.VERCEL && req.query.debug === '1') {
+      meta.source = data.length && data[0].id?.startsWith('mimatour-mock') ? 'mock' : 'scraper';
+    }
+    res.json({ success: true, data, meta });
   } catch (err) {
     console.error('[API] Erro ao buscar viagens:', err.message);
     res.status(500).json({ success: false, error: err.message || 'Falha ao buscar viagens' });
