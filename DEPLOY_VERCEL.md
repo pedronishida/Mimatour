@@ -4,7 +4,7 @@
 
 Na Vercel o Playwright não roda. Para **GET /trips** retornar **todas as viagens reais** do site:
 
-1. Faça deploy do **mesmo repositório** na **Railway** (ou Render): [railway.app](https://railway.app) → New Project → Deploy from GitHub → escolha **Mimatour**. A Railway usa o Dockerfile e roda o scraper.
+1. Faça deploy do **mesmo repositório** na **Railway**: [railway.app](https://railway.app) → New Project → Deploy from GitHub → escolha **Mimatour**. Na Railway, no serviço: **Settings** → **Build** → em "Dockerfile path" use **Dockerfile.railway** (assim o scraper com Playwright sobe).
 2. Depois do deploy, copie a URL pública (ex.: `https://mimatour-production-xxxx.up.railway.app`).
 3. Na **Vercel**: projeto **mimatour** → **Settings** → **Environment Variables** → adicione:
    - **Name:** `SCRAPER_URL`
