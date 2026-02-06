@@ -172,6 +172,7 @@ app.get('/trips', async (req, res) => {
       preco_min: priceFilters.min,
       preco_max: priceFilters.max,
     };
+    res.setHeader('X-Filtro-Busca', searchTerm || 'nenhum');
     res.json({ success: true, data, meta });
   } catch (err) {
     console.error('[API] Erro ao buscar viagens:', err.message);
