@@ -1,0 +1,32 @@
+{
+  "name": "mimatour-api",
+  "version": "1.0.0",
+  "description": "API REST para coleta e consulta de viagens Mimatour (suareservaonline)",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node index.js",
+    "start:ts": "node dist/index.js",
+    "dev": "node index.js",
+    "dev:ts": "tsx watch src/index.ts",
+    "lint": "tsc --noEmit",
+    "fetch-page": "node scripts/fetch-page.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "cheerio": "^1.0.0-rc.12",
+    "cors": "^2.8.6",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "playwright": "^1.40.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "tsx": "^4.6.2",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,2 @@
+# Coloque aqui o HTML da listagem do site (ex.: mimatour-listagem.html)
+# Salve a página no navegador e defina FIXTURE_HTML_PATH=fixtures/mimatour-listagem.html
