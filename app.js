@@ -52,14 +52,41 @@ const MOCK_RAW = [
   { id: 'mimatour-mock-15', title: 'Jericoacoara - Ceará', destination: 'Jericoacoara, CE', description: 'Dunas, lagoa e pôr do sol.', departure_date: '2025-09-20', return_date: '2025-09-25', duration_days: 6, price: 3190, availability: true, image_url: '', source_url: 'https://mimatourviagens.suareservaonline.com.br/pacote/jericoacoara' },
 ];
 
+/** Na Vercel: se SCRAPER_URL estiver definida, busca TODAS as viagens reais nessa URL. */
+async function fetchTripsFromScraperUrl() {
+  const base = process.env.SCRAPER_URL?.replace(/\/$/, '');
+  if (!base) return null;
+  try {
+    const res = await fetch(`${base}/trips`, { signal: AbortSignal.timeout(90000) });
+    const json = await res.json();
+    if (json?.success && Array.isArray(json.data) && json.data.length > 0) return json.data;
+  } catch (e) {
+    console.warn('[API] SCRAPER_URL falhou:', e.message);
+  }
+  return null;
+}
+
+/** Retorna viagens: na Vercel tenta SCRAPER_URL; senão scraper local ou mock. */
 async function getTripsRaw(headless = true) {
-  if (process.env.VERCEL) return MOCK_RAW;
+  if (process.env.VERCEL) {
+    const fromScraper = await fetchTripsFromScraperUrl();
+    if (fromScraper) return fromScraper;
+    return MOCK_RAW;
+  }
   try {
     return await scrapeMimatourTrips({ headless });
   } catch (err) {
     console.warn('[API] Scraper falhou, usando dados mock:', err.message);
     return MOCK_RAW;
   }
+}
+
+/** Normaliza para formato da API: aceita tanto raw (title) quanto já normalizado (titulo). */
+function toData(rawTrips) {
+  if (!rawTrips.length) return [];
+  const first = rawTrips[0];
+  if (first.titulo != null) return rawTrips;
+  return rawTrips.map(toApiTrip);
 }
 
 app.get('/health', (req, res) => {
@@ -76,7 +103,7 @@ app.get('/trips', async (req, res) => {
   try {
     const headless = req.query.headless !== 'false';
     const rawTrips = await getTripsRaw(headless);
-    const data = rawTrips.map(toApiTrip);
+    const data = toData(rawTrips);
     res.json({ success: true, data, meta: { total: data.length } });
   } catch (err) {
     console.error('[API] Erro ao buscar viagens:', err.message);
@@ -89,7 +116,7 @@ app.get('/trips/search', async (req, res) => {
     const q = (req.query.q || '').trim();
     if (!q) return res.status(400).json({ success: false, error: 'Parâmetro "q" é obrigatório' });
     const rawTrips = await getTripsRaw(req.query.headless !== 'false');
-    const all = rawTrips.map(toApiTrip);
+    const all = toData(rawTrips);
     const term = q.toLowerCase();
     const data = all.filter(
       (t) =>
@@ -108,7 +135,7 @@ app.get('/trips/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const rawTrips = await getTripsRaw(req.query.headless !== 'false');
-    const all = rawTrips.map(toApiTrip);
+    const all = toData(rawTrips);
     const trip = all.find((t) => t.id === id);
     if (!trip) return res.status(404).json({ success: false, error: 'Viagem não encontrada', id });
     res.json({ success: true, data: trip });

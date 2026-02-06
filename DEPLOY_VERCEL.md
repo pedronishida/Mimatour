@@ -1,12 +1,19 @@
 # Deploy da Mimatour API na Vercel – Passo a passo
 
-## Aviso importante
+## Retornar TODAS as viagens reais na Vercel
 
-Na **Vercel** o **Playwright não roda** (ambiente serverless não tem navegador). Por isso:
+Na Vercel o Playwright não roda. Para **GET /trips** retornar **todas as viagens reais** do site:
 
-- **GET /trips** na Vercel sempre retorna **dados mock** (2 viagens de exemplo).
-- **GET /health**, **GET /trips/search**, **GET /trips/:id** e **POST /webhook/in** funcionam normalmente.
-- Para ter **dados reais** do site Mimatour em produção, use **Railway** ou **Render** (servidor com Node + Playwright).
+1. Faça deploy do **mesmo repositório** na **Railway** (ou Render): [railway.app](https://railway.app) → New Project → Deploy from GitHub → escolha **Mimatour**. A Railway usa o Dockerfile e roda o scraper.
+2. Depois do deploy, copie a URL pública (ex.: `https://mimatour-production-xxxx.up.railway.app`).
+3. Na **Vercel**: projeto **mimatour** → **Settings** → **Environment Variables** → adicione:
+   - **Name:** `SCRAPER_URL`
+   - **Value:** a URL da Railway (ex.: `https://mimatour-production-xxxx.up.railway.app`)
+4. Faça **Redeploy** do projeto na Vercel (Deployments → ⋮ → Redeploy).
+
+A partir daí, **https://mimatour.vercel.app/trips** passa a buscar as viagens na URL configurada e retorna **todas** as viagens reais. O FluxiChat continua usando só a URL da Vercel.
+
+Se **SCRAPER_URL** não estiver definida, a Vercel retorna 15 viagens de exemplo (mock).
 
 ---
 
@@ -49,7 +56,7 @@ Na **Vercel** o **Playwright não roda** (ambiente serverless não tem navegador
 6. **Build and Output Settings:**
    - Build Command: deixe em branco ou `npm run build` (o projeto não exige build para a API em JS).
    - Output Directory: deixe em branco.
-7. **Environment Variables (opcional):** não é obrigatório para rodar; se tiver `.env` local, pode adicionar variáveis no painel da Vercel depois (Settings → Environment Variables).
+7. **Environment Variables (opcional):** para retornar **todas as viagens reais**, depois do deploy adicione `SCRAPER_URL` com a URL de um backend que rode o scraper (veja início deste arquivo).
 8. Clique em **Deploy**.
 
 ---
@@ -86,7 +93,7 @@ Endpoints:
 | Endpoint        | URL exemplo |
 |-----------------|-------------|
 | Health          | `https://SEU_PROJETO.vercel.app/health` |
-| Viagens (mock)  | `https://SEU_PROJETO.vercel.app/trips` |
+| Viagens (todas) | `https://SEU_PROJETO.vercel.app/trips` (reais se SCRAPER_URL estiver definida) |
 | Busca           | `https://SEU_PROJETO.vercel.app/trips/search?q=gramado` |
 | Webhook         | `POST https://SEU_PROJETO.vercel.app/webhook/in` |
 
@@ -100,7 +107,7 @@ Use essa **URL base** no FluxiChat em “External Request”.
   Deve retornar algo como: `{"success":true,"service":"mimatour-api","status":"ok",...}`
 
 - Depois: `https://SEU_PROJETO.vercel.app/trips`  
-  Deve retornar `success: true` e `data` com 2 viagens (mock).
+  Deve retornar `success: true` e `data` com as viagens (reais se `SCRAPER_URL` estiver configurada).
 
 ---
 
@@ -108,8 +115,6 @@ Use essa **URL base** no FluxiChat em “External Request”.
 
 | Onde   | Como fazer |
 |--------|------------|
-| **Vercel** | Conectar repo no [vercel.com/new](https://vercel.com/new) ou usar `vercel` / `vercel --prod` na pasta do projeto. |
-| **URL no FluxiChat** | Colocar `https://SEU_PROJETO.vercel.app` e o path (ex.: `/trips`). |
-| **Dados reais** | Fazer deploy em **Railway** ou **Render** (não Vercel) para o Playwright rodar e buscar as viagens reais do site. |
-
-Se quiser, no próximo passo dá para descrever o deploy na Railway ou no Render para ter scraping real em produção.
+| **Vercel** | Conectar repo no [vercel.com/new](https://vercel.com/new) ou usar `vercel` / `vercel --prod`. |
+| **URL no FluxiChat** | Usar `https://SEU_PROJETO.vercel.app/trips`. |
+| **TODAS as viagens reais** | Deploy do mesmo repo na Railway, copiar a URL e definir **SCRAPER_URL** na Vercel (Settings → Environment Variables) e redeployar. |
