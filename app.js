@@ -54,12 +54,15 @@ const MOCK_RAW = [
 
 /** Na Vercel: se SCRAPER_URL estiver definida, busca TODAS as viagens reais nessa URL. */
 async function fetchTripsFromScraperUrl() {
-  const base = process.env.SCRAPER_URL?.replace(/\/$/, '');
+  let base = (process.env.SCRAPER_URL || '').trim().replace(/\/$/, '');
   if (!base) return null;
+  if (!/^https?:\/\//i.test(base)) base = `https://${base}`;
   try {
-    const res = await fetch(`${base}/trips`, { signal: AbortSignal.timeout(90000) });
+    const url = `${base}/trips`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(55000) });
     const json = await res.json();
-    if (json?.success && Array.isArray(json.data) && json.data.length > 0) return json.data;
+    if (res.ok && json?.data && Array.isArray(json.data) && json.data.length > 0) return json.data;
+    if (!res.ok) console.warn('[API] SCRAPER_URL respondeu', res.status, url);
   } catch (e) {
     console.warn('[API] SCRAPER_URL falhou:', e.message);
   }
@@ -89,6 +92,53 @@ function toData(rawTrips) {
   return rawTrips.map(toApiTrip);
 }
 
+/** Termo de busca: query "q" ou cabeçalhos X-Search / X-Query (para FluxiChat). */
+function getSearchTerm(req) {
+  const fromQuery = (req.query.q || '').trim();
+  if (fromQuery) return fromQuery;
+  const raw = req.headers && (req.headers['x-search'] || req.headers['x-query']);
+  const fromHeader = (raw != null ? String(raw) : '').trim();
+  return fromHeader || '';
+}
+
+/** Extrai número de um valor (apenas dígitos; ignora cifrão, letras, pontos). */
+function parseNum(val) {
+  if (val == null || val === '') return null;
+  const s = String(val).replace(/\D/g, '');
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Filtro de preço: query preco_min/preco_max ou cabeçalhos X-Preco-Min / X-Preco-Max (apenas números). */
+function getPriceFilters(req) {
+  const min = parseNum(req.query.preco_min ?? req.get('x-preco-min')) ?? null;
+  const max = parseNum(req.query.preco_max ?? req.get('x-preco-max')) ?? null;
+  return { min, max };
+}
+
+function filterTripsByTerm(trips, term) {
+  if (!term) return trips;
+  const t = term.toLowerCase();
+  return trips.filter(
+    (x) =>
+      (x.titulo && x.titulo.toLowerCase().includes(t)) ||
+      (x.destino && x.destino.toLowerCase().includes(t)) ||
+      (x.descricao && x.descricao.toLowerCase().includes(t))
+  );
+}
+
+function filterTripsByPrice(trips, { min, max }) {
+  if (min == null && max == null) return trips;
+  return trips.filter((x) => {
+    const p = x.preco != null ? Number(x.preco) : NaN;
+    if (!Number.isFinite(p)) return false;
+    if (min != null && p < min) return false;
+    if (max != null && p > max) return false;
+    return true;
+  });
+}
+
 app.get('/health', (req, res) => {
   res.json({
     success: true,
@@ -105,11 +155,23 @@ app.get('/trips', async (req, res) => {
   try {
     const headless = req.query.headless !== 'false';
     const rawTrips = await getTripsRaw(headless);
-    const data = toData(rawTrips);
+    let data = toData(rawTrips);
+    const searchTerm = getSearchTerm(req);
+    if (searchTerm) data = filterTripsByTerm(data, searchTerm);
+    const priceFilters = getPriceFilters(req);
+    data = filterTripsByPrice(data, priceFilters);
     const meta = { total: data.length };
+    if (searchTerm) meta.query = searchTerm;
+    if (priceFilters.min != null) meta.preco_min = priceFilters.min;
+    if (priceFilters.max != null) meta.preco_max = priceFilters.max;
     if (process.env.VERCEL && req.query.debug === '1') {
       meta.source = data.length && data[0].id?.startsWith('mimatour-mock') ? 'mock' : 'scraper';
     }
+    meta.filtros_recebidos = {
+      busca: searchTerm || null,
+      preco_min: priceFilters.min,
+      preco_max: priceFilters.max,
+    };
     res.json({ success: true, data, meta });
   } catch (err) {
     console.error('[API] Erro ao buscar viagens:', err.message);
@@ -119,18 +181,17 @@ app.get('/trips', async (req, res) => {
 
 app.get('/trips/search', async (req, res) => {
   try {
-    const q = (req.query.q || '').trim();
-    if (!q) return res.status(400).json({ success: false, error: 'Parâmetro "q" é obrigatório' });
+    const q = getSearchTerm(req);
     const rawTrips = await getTripsRaw(req.query.headless !== 'false');
-    const all = toData(rawTrips);
-    const term = q.toLowerCase();
-    const data = all.filter(
-      (t) =>
-        (t.titulo && t.titulo.toLowerCase().includes(term)) ||
-        (t.destino && t.destino.toLowerCase().includes(term)) ||
-        (t.descricao && t.descricao.toLowerCase().includes(term))
-    );
-    res.json({ success: true, data, meta: { total: data.length, query: q } });
+    let data = toData(rawTrips);
+    if (q) data = filterTripsByTerm(data, q);
+    data = filterTripsByPrice(data, getPriceFilters(req));
+    const meta = { total: data.length };
+    if (q) meta.query = q;
+    const priceFilters = getPriceFilters(req);
+    if (priceFilters.min != null) meta.preco_min = priceFilters.min;
+    if (priceFilters.max != null) meta.preco_max = priceFilters.max;
+    res.json({ success: true, data, meta });
   } catch (err) {
     console.error('[API] Erro na busca:', err.message);
     res.status(500).json({ success: false, error: err.message || 'Falha na busca' });
