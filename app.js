@@ -209,6 +209,22 @@ app.get('/trips/search', async (req, res) => {
   }
 });
 
+/** Filtro no PATH: /trips/search/ilhabela (não depende de query string). */
+app.get('/trips/search/:term', async (req, res) => {
+  try {
+    const term = (req.params.term || '').trim();
+    if (!term) return res.redirect(302, '/trips');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    const rawTrips = await getTripsRaw(true);
+    let data = filterTripsByTerm(toData(rawTrips), term);
+    data = filterTripsByPrice(data, getPriceFilters(req));
+    res.json({ success: true, data, meta: { total: data.length, query: term } });
+  } catch (err) {
+    console.error('[API] Erro /trips/search/:term:', err.message);
+    res.status(500).json({ success: false, error: err.message || 'Falha na busca' });
+  }
+});
+
 app.get('/trips/:id', async (req, res) => {
   try {
     const { id } = req.params;
