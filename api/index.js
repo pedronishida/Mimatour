@@ -1,7 +1,12 @@
 /**
  * Handler da Vercel Serverless.
- * Todas as rotas são encaminhadas para o app Express.
+ * Rewrite envia /trips/... para /api/trips/...; removemos o prefixo /api para o Express ver /trips/...
  */
 import app from '../app.js';
 
-export default app;
+export default function handler(req, res) {
+  if (typeof req.url === 'string' && req.url.startsWith('/api')) {
+    req.url = req.url.replace(/^\/api/, '') || '/';
+  }
+  app(req, res);
+}
