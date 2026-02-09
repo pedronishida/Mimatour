@@ -92,16 +92,12 @@ function toData(rawTrips) {
   return rawTrips.map(toApiTrip);
 }
 
-/** Termo de busca: query "q", ou cabeçalhos q / X-Search / X-Query (FluxiChat usa Cabeçalhos com Key "q"). */
+/** Termo de busca: só pela URL, ex. /trips?q=ilhabela */
 function getSearchTerm(req) {
-  const fromQuery = (req.query.q || '').trim();
-  if (fromQuery) return fromQuery;
-  const raw = req.headers && (req.headers['q'] || req.headers['x-search'] || req.headers['x-query']);
-  const fromHeader = (raw != null ? String(raw) : '').trim();
-  return fromHeader || '';
+  return (req.query.q || '').trim();
 }
 
-/** Extrai número de um valor (apenas dígitos; ignora cifrão, letras, pontos). */
+/** Extrai número (apenas dígitos). Preço só pela URL: preco_min=100&preco_max=500 */
 function parseNum(val) {
   if (val == null || val === '') return null;
   const s = String(val).replace(/\D/g, '');
@@ -110,10 +106,9 @@ function parseNum(val) {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Filtro de preço: query preco_min/preco_max ou cabeçalhos X-Preco-Min / X-Preco-Max (apenas números). */
 function getPriceFilters(req) {
-  const min = parseNum(req.query.preco_min ?? req.get('x-preco-min')) ?? null;
-  const max = parseNum(req.query.preco_max ?? req.get('x-preco-max')) ?? null;
+  const min = parseNum(req.query.preco_min) ?? null;
+  const max = parseNum(req.query.preco_max) ?? null;
   return { min, max };
 }
 
@@ -167,12 +162,6 @@ app.get('/trips', async (req, res) => {
     if (process.env.VERCEL && req.query.debug === '1') {
       meta.source = data.length && data[0].id?.startsWith('mimatour-mock') ? 'mock' : 'scraper';
     }
-    meta.filtros_recebidos = {
-      busca: searchTerm || null,
-      preco_min: priceFilters.min,
-      preco_max: priceFilters.max,
-    };
-    res.setHeader('X-Filtro-Busca', searchTerm || 'nenhum');
     res.json({ success: true, data, meta });
   } catch (err) {
     console.error('[API] Erro ao buscar viagens:', err.message);
