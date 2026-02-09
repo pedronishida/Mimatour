@@ -78,7 +78,7 @@ async function fetchTripsFromScraperUrl() {
 }
 
 /** Retorna viagens: na Vercel tenta SCRAPER_URL; senão scraper local ou mock. */
-async function getTripsRaw(headless = true) {
+export async function getTripsRaw(headless = true) {
   if (process.env.VERCEL) {
     const fromScraper = await fetchTripsFromScraperUrl();
     if (fromScraper) return fromScraper;
@@ -93,7 +93,7 @@ async function getTripsRaw(headless = true) {
 }
 
 /** Normaliza para formato da API: aceita tanto raw (title) quanto já normalizado (titulo). */
-function toData(rawTrips) {
+export function toData(rawTrips) {
   if (!rawTrips.length) return [];
   const first = rawTrips[0];
   if (first.titulo != null) return rawTrips;
@@ -136,7 +136,7 @@ function getPriceFilters(req) {
   return { min, max };
 }
 
-function filterTripsByTerm(trips, term) {
+export function filterTripsByTerm(trips, term) {
   if (!term) return trips;
   const t = term.toLowerCase();
   return trips.filter(
