@@ -92,11 +92,11 @@ function toData(rawTrips) {
   return rawTrips.map(toApiTrip);
 }
 
-/** Termo de busca: query "q" ou cabeçalhos X-Search / X-Query (para FluxiChat). */
+/** Termo de busca: query "q", ou cabeçalhos q / X-Search / X-Query (FluxiChat usa Cabeçalhos com Key "q"). */
 function getSearchTerm(req) {
   const fromQuery = (req.query.q || '').trim();
   if (fromQuery) return fromQuery;
-  const raw = req.headers && (req.headers['x-search'] || req.headers['x-query']);
+  const raw = req.headers && (req.headers['q'] || req.headers['x-search'] || req.headers['x-query']);
   const fromHeader = (raw != null ? String(raw) : '').trim();
   return fromHeader || '';
 }
