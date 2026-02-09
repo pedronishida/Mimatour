@@ -92,9 +92,24 @@ function toData(rawTrips) {
   return rawTrips.map(toApiTrip);
 }
 
+/** Garante que a query string seja lida (Vercel/serverless às vezes não preenche req.query). */
+function getQuery(req) {
+  if (req.query && Object.keys(req.query).length > 0) return req.query;
+  try {
+    const u = req.url || req.originalUrl || '';
+    const i = u.indexOf('?');
+    if (i === -1) return {};
+    const params = new URLSearchParams(u.slice(i));
+    return Object.fromEntries(params.entries());
+  } catch (_) {
+    return {};
+  }
+}
+
 /** Termo de busca: só pela URL, ex. /trips?q=ilhabela */
 function getSearchTerm(req) {
-  return (req.query.q || '').trim();
+  const query = getQuery(req);
+  return (query.q || '').trim();
 }
 
 /** Extrai número (apenas dígitos). Preço só pela URL: preco_min=100&preco_max=500 */
@@ -107,8 +122,9 @@ function parseNum(val) {
 }
 
 function getPriceFilters(req) {
-  const min = parseNum(req.query.preco_min) ?? null;
-  const max = parseNum(req.query.preco_max) ?? null;
+  const query = getQuery(req);
+  const min = parseNum(query.preco_min) ?? null;
+  const max = parseNum(query.preco_max) ?? null;
   return { min, max };
 }
 
@@ -148,7 +164,9 @@ app.get('/health', (req, res) => {
 
 app.get('/trips', async (req, res) => {
   try {
-    const headless = req.query.headless !== 'false';
+    const query = getQuery(req);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    const headless = query.headless !== 'false';
     const rawTrips = await getTripsRaw(headless);
     let data = toData(rawTrips);
     const searchTerm = getSearchTerm(req);
@@ -159,9 +177,10 @@ app.get('/trips', async (req, res) => {
     if (searchTerm) meta.query = searchTerm;
     if (priceFilters.min != null) meta.preco_min = priceFilters.min;
     if (priceFilters.max != null) meta.preco_max = priceFilters.max;
-    if (process.env.VERCEL && req.query.debug === '1') {
+    if (process.env.VERCEL && query.debug === '1') {
       meta.source = data.length && data[0].id?.startsWith('mimatour-mock') ? 'mock' : 'scraper';
     }
+    if (searchTerm) res.setHeader('X-Filtro-Q', searchTerm);
     res.json({ success: true, data, meta });
   } catch (err) {
     console.error('[API] Erro ao buscar viagens:', err.message);
@@ -171,8 +190,10 @@ app.get('/trips', async (req, res) => {
 
 app.get('/trips/search', async (req, res) => {
   try {
+    const query = getQuery(req);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     const q = getSearchTerm(req);
-    const rawTrips = await getTripsRaw(req.query.headless !== 'false');
+    const rawTrips = await getTripsRaw(query.headless !== 'false');
     let data = toData(rawTrips);
     if (q) data = filterTripsByTerm(data, q);
     data = filterTripsByPrice(data, getPriceFilters(req));
