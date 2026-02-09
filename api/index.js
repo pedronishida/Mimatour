@@ -6,11 +6,23 @@ import app, { getTripsRaw, toData, filterTripsByTerm } from '../app.js';
 
 const SEARCH_PATH = /^\/(?:api\/)?trips\/search\/([^/?#]+)/i;
 
-export default async function handler(req, res) {
-  let path = (req.url || req.originalUrl || '').split('?')[0];
+function getPathFromRequest(req) {
+  const raw = req.url || req.originalUrl || '';
+  let path = raw.split('?')[0];
   if (path.startsWith('http')) try { path = new URL(path).pathname; } catch (_) {}
-  const pathFromQuery = req.query && req.query.path;
+  let pathFromQuery = req.query && req.query.path;
+  if (typeof pathFromQuery !== 'string' && raw.includes('?')) {
+    try {
+      const qs = raw.slice(raw.indexOf('?') + 1);
+      pathFromQuery = new URLSearchParams(qs).get('path');
+    } catch (_) {}
+  }
   if (typeof pathFromQuery === 'string') path = '/' + pathFromQuery.replace(/^\//, '');
+  return { path, pathFromQuery };
+}
+
+export default async function handler(req, res) {
+  const { path, pathFromQuery } = getPathFromRequest(req);
   const match = path.match(SEARCH_PATH);
   if (req.method === 'GET' && match) {
     const term = decodeURIComponent(match[1] || '').trim();
@@ -29,10 +41,12 @@ export default async function handler(req, res) {
       }
     }
   }
+  const raw = req.url || req.originalUrl || '';
+  const qs = raw.includes('?') ? raw.slice(raw.indexOf('?')) : '';
   if (typeof pathFromQuery === 'string') {
-    req.url = '/' + pathFromQuery.replace(/^\//, '') + (req.url && req.url.includes('?') ? '?' + req.url.split('?').slice(1).join('?') : '');
+    req.url = path + qs;
   } else if (typeof req.url === 'string' && req.url.startsWith('/api')) {
-    req.url = req.url.replace(/^\/api/, '') || '/';
+    req.url = (req.url.replace(/^\/api/, '') || '/') + qs;
   }
   app(req, res);
 }
