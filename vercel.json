@@ -1,6 +1,6 @@
 {
   "version": 2,
   "builds": [{"src": "api/index.js", "use": "@vercel/node"}],
-  "rewrites": [{"source": "/(.*)", "destination": "/api/$1"}],
+  "rewrites": [{"source": "/(.*)", "destination": "/api?path=$1"}],
   "functions": {"api/index.js": {"maxDuration": 60}}
 }

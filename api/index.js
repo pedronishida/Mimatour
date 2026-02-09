@@ -9,6 +9,8 @@ const SEARCH_PATH = /^\/(?:api\/)?trips\/search\/([^/?#]+)/i;
 export default async function handler(req, res) {
   let path = (req.url || req.originalUrl || '').split('?')[0];
   if (path.startsWith('http')) try { path = new URL(path).pathname; } catch (_) {}
+  const pathFromQuery = req.query && req.query.path;
+  if (typeof pathFromQuery === 'string') path = '/' + pathFromQuery.replace(/^\//, '');
   const match = path.match(SEARCH_PATH);
   if (req.method === 'GET' && match) {
     const term = decodeURIComponent(match[1] || '').trim();
@@ -27,7 +29,9 @@ export default async function handler(req, res) {
       }
     }
   }
-  if (typeof req.url === 'string' && req.url.startsWith('/api')) {
+  if (typeof pathFromQuery === 'string') {
+    req.url = '/' + pathFromQuery.replace(/^\//, '') + (req.url && req.url.includes('?') ? '?' + req.url.split('?').slice(1).join('?') : '');
+  } else if (typeof req.url === 'string' && req.url.startsWith('/api')) {
     req.url = req.url.replace(/^\/api/, '') || '/';
   }
   app(req, res);
