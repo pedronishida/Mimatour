@@ -1,6 +1,15 @@
 {
   "version": 2,
-  "builds": [{"src": "api/index.js", "use": "@vercel/node"}],
-  "rewrites": [{"source": "/(.*)", "destination": "/api?path=$1"}],
-  "functions": {"api/index.js": {"maxDuration": 60}}
+  "builds": [
+    {"src": "api/index.js", "use": "@vercel/node"},
+    {"src": "api/trips-search.js", "use": "@vercel/node"}
+  ],
+  "rewrites": [
+    {"source": "/trips/search/:term", "destination": "/api/trips-search?term=:term"},
+    {"source": "/(.*)", "destination": "/api?path=$1"}
+  ],
+  "functions": {
+    "api/index.js": {"maxDuration": 60},
+    "api/trips-search.js": {"maxDuration": 60}
+  }
 }
