@@ -13,6 +13,14 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
+// Na Vercel o path chega como /api/trips/...; o Express precisa ver /trips/...
+app.use((req, res, next) => {
+  if (typeof req.url === 'string' && req.url.startsWith('/api')) {
+    req.url = req.url.replace(/^\/api/, '') || '/';
+  }
+  next();
+});
+
 function toApiTrip(raw) {
   const duracao =
     raw.duration_days != null ? `${raw.duration_days} dia${raw.duration_days !== 1 ? 's' : ''}` : null;
@@ -210,7 +218,7 @@ app.get('/trips/search', async (req, res) => {
 });
 
 /** Filtro no PATH: /trips/search/ilhabela (não depende de query string). */
-app.get('/trips/search/:term', async (req, res) => {
+const searchByTermHandler = async (req, res) => {
   try {
     const term = (req.params.term || '').trim();
     if (!term) return res.redirect(302, '/trips');
@@ -223,6 +231,13 @@ app.get('/trips/search/:term', async (req, res) => {
     console.error('[API] Erro /trips/search/:term:', err.message);
     res.status(500).json({ success: false, error: err.message || 'Falha na busca' });
   }
+};
+app.get('/trips/search/:term', searchByTermHandler);
+app.get('/api/trips/search/:term', searchByTermHandler);
+// Vercel às vezes envia path em req.url como /api/trips/search/term; regex cobre qualquer formato
+app.get(/^\/(?:api\/)?trips\/search\/([^/]+)\/?$/i, (req, res) => {
+  req.params = { term: req.params[0] };
+  return searchByTermHandler(req, res);
 });
 
 app.get('/trips/:id', async (req, res) => {
